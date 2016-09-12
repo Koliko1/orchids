@@ -1,0 +1,188 @@
+/**
+ ** @file mod_@@MOD_TEMPLATE@@.c
+ ** The @@MOD_TEMPLATE@@ module.
+ **
+ ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ **
+ ** @version 0.1
+ ** @ingroup modules
+ ** 
+ **
+ ** @date  Started on: Fri Feb  7 11:07:42 2003
+ **/
+
+/*
+ * See end of file for LICENSE and COPYRIGHT informations.
+ */
+
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
+
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "orchids.h"
+
+#include "mod_@@MOD_TEMPLATE@@.h"
+
+
+input_module_t mod_@@MOD_TEMPLATE@@;
+
+
+static int
+@@MOD_TEMPLATE@@_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
+{
+  DebugLog(DF_MOD, DS_TRACE, "@@MOD_TEMPLATE@@_dissector()\n");
+
+  /* dissect event top attribute here, and add them to it */
+
+  /* then, post resulting event */
+  post_event(ctx, mod, e);
+
+  return (0);
+}
+
+
+static void *
+@@MOD_TEMPLATE@@_preconfig(orchids_t *ctx, mod_entry_t *mod)
+{
+  @@MOD_TEMPLATE@@_config_t *cfg;
+
+  DebugLog(DF_MOD, DS_INFO, "load() @@MOD_TEMPLATE@@@%p\n", &mod_@@MOD_TEMPLATE@@);
+
+  /* allocate some memory for module configuration
+  ** and initialize default configuration. */
+  cfg = Xzmalloc(sizeof (@@MOD_TEMPLATE@@_config_t));
+  cfg->some_flag = DEFAULT_FLAG;
+  cfg->some_option = DEFAULT_OPTION;
+
+  /* hard coded callback registration.
+  ** optionnal goes in config directives */
+  register_dissector(ctx, mod, "parent", @@MOD_TEMPLATE@@_dissector, NULL);
+  //register_conditional_dissector(ctx, mod, "parent", (void *)"messages", 8,
+  //                               dissect_syslog);
+
+  register_fields(ctx, mod, @@MOD_TEMPLATE@@_fields, TEMPLATE_FIELDS);
+
+  /* return config structure, for module manager */
+  return (cfg);
+}
+
+
+static void
+@@MOD_TEMPLATE@@_postconfig(orchids_t *ctx, mod_entry_t *mod)
+{
+  /* Do all thing needed _AFTER_ module configuration.
+  ** (register configurable callbacks for examples) */
+}
+
+
+static void
+@@MOD_TEMPLATE@@_postcompil(orchids_t *ctx, mod_entry_t *mod)
+{
+  /* Do all thing needed _AFTER_ rule compilation. */
+}
+
+
+static void
+set_some_flag(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  int someflag;
+  @@MOD_TEMPLATE@@_config_t *cfg;
+
+  someflag = atoi(dir->args);
+  DebugLog(DF_MOD, DS_INFO, "setting some_flag to %i\n", someflag);
+
+  cfg = ((@@MOD_TEMPLATE@@_config_t *)mod->config);
+  cfg->some_flag = someflag;
+}
+
+
+static void
+set_some_option(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  int someoption;
+  @@MOD_TEMPLATE@@_config_t *cfg;
+
+  someoption = atoi(dir->args);
+  DebugLog(DF_MOD, DS_INFO, "setting some_option to %i\n", someoption);
+
+  cfg = ((@@MOD_TEMPLATE@@_config_t *)mod->config);
+  cfg->some_option = someoption;
+}
+
+
+static field_t @@MOD_TEMPLATE@@_fields[] = {
+  { "@@MOD_TEMPLATE@@.field_demoint", T_INT,  "an int field"   },
+  { "@@MOD_TEMPLATE@@.field_demostr", T_VSTR, "a string field" },
+};
+
+
+static mod_cfg_cmd_t @@MOD_TEMPLATE@@_config_commands[] = {
+  { "SomeFlag", set_some_flag, "Set some_flag value" },
+  { "SomeOption", set_some_option, "Set some_option value" },
+  { NULL, NULL, NULL }
+};
+
+
+static char *@@MOD_TEMPLATE@@_dependencies[] = {
+  "somemod",
+  "modblahblah",
+  "miscstuff",
+  NULL
+};
+
+input_module_t mod_@@MOD_TEMPLATE@@ = {
+  MOD_MAGIC,                /* Magic number */
+  ORCHIDS_VERSION,          /* Module version */
+  "@@MOD_TEMPLATE@@",       /* module name */
+  "CeCILL2",                /* module license */
+  @@MOD_TEMPLATE@@_dependencies,    /* module dependencies */
+  @@MOD_TEMPLATE@@_config_commands, /* module configuration commands,
+                               for core config parser */
+  @@MOD_TEMPLATE@@_preconfig,       /* called just after module registration */
+  @@MOD_TEMPLATE@@_postconfig,      /* called after all mods preconfig,
+                               and after all module configuration*/
+  @@MOD_TEMPLATE@@_postcompil
+};
+
+
+/*
+** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+**
+** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+**
+** This software is a computer program whose purpose is to detect intrusions
+** in a computer network.
+**
+** This software is governed by the CeCILL license under French law and
+** abiding by the rules of distribution of free software.  You can use,
+** modify and/or redistribute the software under the terms of the CeCILL
+** license as circulated by CEA, CNRS and INRIA at the following URL
+** "http://www.cecill.info".
+**
+** As a counterpart to the access to the source code and rights to copy,
+** modify and redistribute granted by the license, users are provided
+** only with a limited warranty and the software's author, the holder of
+** the economic rights, and the successive licensors have only limited
+** liability.
+**
+** In this respect, the user's attention is drawn to the risks associated
+** with loading, using, modifying and/or developing or reproducing the
+** software by the user in light of its specific status of free software,
+** that may mean that it is complicated to manipulate, and that also
+** therefore means that it is reserved for developers and experienced
+** professionals having in-depth computer knowledge. Users are therefore
+** encouraged to load and test the software's suitability as regards
+** their requirements in conditions enabling the security of their
+** systems and/or data to be ensured and, more generally, to use and
+** operate it in the same conditions as regards security.
+**
+** The fact that you are presently reading this means that you have had
+** knowledge of the CeCILL license and that you accept its terms.
+*/
+
+
+/* End-of-file */

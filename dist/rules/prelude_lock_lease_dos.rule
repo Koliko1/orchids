@@ -1,0 +1,70 @@
+/*
+** Linux Kernel Time_Out_Leases PrintK Local Denial of Service Vulnerability
+*  CVE-2005-3857
+*  Attack published : Nov 29 2005 12:00AM
+*  Vulnerable : ubunto, redhat,MandrakeSoft Multi Network Firewall,
+*              SGI ProPack,Trustix Secure Linux, linux kernel 2.6.X ...
+*  Notice : just make auditd sensor audit the "fcntl64" syscall !
+*           --> tape : auditctl -a entry,always -S fcntl64
+*/
+
+
+#define MAX_CALLS 4
+#define SYSCALL 221
+
+rule prelude_lock_lease_dos
+{
+  state init
+  {
+    expect (.auditd.syscall == SYSCALL)
+      goto start;
+  }
+
+  state start
+  {
+    $counter = 1 ;
+    $attack_pid = .auditd.pid;
+
+    expect (.auditd.pid == $attack_pid &&
+	    .auditd.syscall == SYSCALL &&
+            .prelude.classification_text == "Lock lease dos" &&
+            .prelude.assessment_completion == "failed")
+      goto listen_loop;
+  }
+
+  state listen_loop
+  {
+    $counter = $counter + 1;
+    expect ($counter == MAX_CALLS)
+      goto alert;
+
+    expect ( .auditd.pid == $attack_pid &&
+	     .auditd.syscall == SYSCALL &&
+	     $counter < MAX_CALLS)
+      goto listen_loop;
+  }
+
+
+  state alert
+  {
+    $message = "Time_Out_Leases PrintK Local Denial of Service attack detected !!";
+    print($message);
+    $reaction = "kill -9 " + str_from_int( $attack_pid ) ;
+    $msg= " ---> Orchids is reacting : killing attack process !!";
+    print($msg);
+    print( $reaction );
+    $attacker = str_from_int(auditd.pid);
+
+    $idmef = idmef_message_new();
+    idmef_message_set($idmef, "alert.assessment.impact.description", $message);
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "high");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "succeded");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.classification.text", "Local Denial of Service");
+    idmef_message_set($idmef, "alert.source(0).node.address(0).address", $attacker)
+    idmef_message_set($idmef, "alert.target(0).node.address(0).address", "root");
+    //additional data $reaction / $msg
+    idmef_message_send($idmef);
+  }
+
+}/* end rule lock_lease_dos*/

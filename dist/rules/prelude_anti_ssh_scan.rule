@@ -1,0 +1,73 @@
+/*
+*/
+
+#define MAX_ATTEMPT 3
+
+#define FIREWALL "raisin"
+#define RCMD(dest, cmd) "ssh root@" dest " '" + (cmd) + "'"
+#define IPTABLES "/sbin/iptables"
+#define BLACKLISTTABLE "blacklist"
+
+#define BLOCKIP_CMD(ip) \
+  IPTABLES " --append " BLACKLISTTABLE \
+    " --proto TCP --source " + (ip)
+
+rule prelude_anti_ssh_scan synchronize($attacker) {
+
+  state init {
+    $attempts = 1;
+    expect (.sshd.action == "Failed")
+      goto update_counter;
+  }
+
+  state update_counter {
+    $start_time = .udp.time;
+    $attacker = .sshd.src_ip;
+    $attempts = $attempts + 1;
+    goto failed_loop;
+  }
+
+  state failed_loop {
+    $attempts = $attempts + 1;
+   /* Capture other network activities of the suspected attacker. */
+   expect (    .netfilter.src == $attacker
+        && .nfhub.desc != "ssh"
+        && .nfhub.desc != "ssh*")
+     goto failed_loop;
+
+   /* Log successful loggin of the attacker. */
+   expect (    .sshd.src_ip == $attacker
+        && .sshd.action == "Accepted")
+     goto failed_loop;
+
+   /* Count the number of failed attempts. */
+   expect (    .sshd.action == "Failed"
+        && $attacker == .sshd.src_ip
+        && $attempts < MAX_ATTEMPT)
+     goto update_counter;
+
+   /* If the limit is reached, block the attacked. */
+   expect (    .sshd.action == "Failed"
+        && $attacker == .sshd.src_ip
+        &&  $attempts >= MAX_ATTEMPT )
+     goto block_attacker;
+  }
+
+  state block_attacker {
+    $source = str_from_ipv4($attacker);
+    $target = "root";//str_from_ipv4(.sshd.host);
+    $port = str_from_int(.sshd.src_port);
+    $idmef = idmef_message_new();
+    idmef_message_set($idmef, "alert.assessment.impact.description", "Number of failed login to SSH port");
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", .sshd.action);
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.classification.text", "Anti-ssh scan");
+    idmef_message_set($idmef, "alert.source(0).node.address(0).address", $source);
+    idmef_message_set($idmef, "alert.target(0).node.address(0).address", $target);
+    idmef_message_set($idemf, "alert.target(0).service.name", "ssh");
+    idmef_message_set($idmef, "alert.target(0).service.port", $port);
+    idmef_message_send($idmef);
+ }
+}
+

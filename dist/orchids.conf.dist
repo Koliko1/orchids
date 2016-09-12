@@ -1,0 +1,58 @@
+#                                    _     _     _
+#       __/\_______    ___  _ __ ___| |__ (_) __| |___   _______/\__
+#  _____\    /_____|  / _ \| '__/ __| '_ \| |/ _` / __| |_____\    /_____
+# |_____/_  _\_____| | (_) | | | (__| | | | | (_| \__ \ |_____/_  _\_____|
+#         \/          \___/|_|  \___|_| |_|_|\__,_|___/         \/
+#
+# ORCHIDS Configuration file
+#
+
+# Set a virtual memory limit.  This is meant to avoid memory explosion
+# when testing/writing new rules.
+# For a start, 128 MB should be enough
+
+MaxMemorySize 134217728
+
+
+# Set the module directory.  This is the place where
+# module binary files will be loaded.
+
+SetModuleDir @@LIBDIR@@/orchids
+
+# Define preprocessor command for each rule file suffix.
+
+AddPreprocessorCmd .cpp.rule  cpp
+AddPreprocessorCmd  .m4.rule  m4
+
+# The default preprocessor is normally the "cat" command
+# It is set here to cpp for convenience
+SetDefaultPreprocessorCmd     cpp
+
+# This is the runtime user id in which Orchids will drop root provoleges.
+
+RuntimeUser @@RUNUSER@@
+
+# Disable Network name resolution by default
+
+ResolveIP  no
+
+
+# Remove this comment to set the process priority
+# Nice -10
+
+
+# Include the used module file.
+
+Include @@ETCDIR@@/orchids/orchids-modules.conf
+
+# Include module specific configurations files...
+
+Include @@ETCDIR@@/orchids/conf.d/*.conf
+
+# Include the rule definition file.
+
+Include @@ETCDIR@@/orchids/orchids-rules.conf
+
+# Include the inputs definition file
+
+Include @@ETCDIR@@/orchids/orchids-inputs.conf

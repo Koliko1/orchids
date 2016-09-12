@@ -1,0 +1,40 @@
+/*
+** test prelude analyzer mode
+*/
+
+rule preludeSSHBruteforce synchronize($source)
+{
+  state init
+  {
+    $count = 0;
+    .prelude.classification_text == "Login";
+    .prelude.assessment_completion == "failed";
+    $source = .prelude.first_source_addr;
+    goto loop;
+  }
+
+  state loop
+  {
+    $count = $count + 1;
+
+    expect ($count >= 10)
+      goto end;
+
+    expect ($count < 10)
+      goto loop;
+  }
+
+  state end
+  {
+    //$source = str_from_ipv4(.prelude.src_ip);
+    $idmef = idmef_message_new();
+    idmef_message_set($idmef, "alert.assessment.impact.description", "Brute force detected");
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.classification.text", "SSH Brute force detected");
+    idmef_message_set($idmef, "alert.source(0).node.address(0).address", "Source");  
+    idmef_message_set($idmef, "alert.target(0).node.address(0).address", "Target");
+    idmef_message_send($idmef);
+  }
+}

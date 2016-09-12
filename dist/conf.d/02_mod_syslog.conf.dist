@@ -1,0 +1,7 @@
+#
+# Configuration file for the syslog input module
+#
+
+<module syslog>
+
+</module>

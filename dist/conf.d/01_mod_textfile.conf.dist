@@ -1,0 +1,17 @@
+#
+# Configuration file for textfile input module
+
+<module textfile>
+
+#  # Set the polling period, for checking for new data.
+#  SetPollPeriod 15
+#
+#  # Text files to read data from.
+#  AddInputFile /var/log/messages
+#
+#  # The default behaviour is to process all data in files, at startup.
+  ProcessAll 1
+#  # Stop orchids after processing all files. Usefull for benchmarks
+# ExitAfterProcessAll 1
+#
+</module>

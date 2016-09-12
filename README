@@ -1,0 +1,44 @@
+Quick Installation Guide:
+configure && make && make install
+_should_ be enought.
+
+
+For testing orchids as an user:
+
+configure --prefix=/tmp/orchids --with-runtime-user=$USER && \
+make && \
+make install
+
+
+Configure options spicific to Orchids:
+--enable-debug    Enable debugging mode (more messages, less forks, no daemon)
+--enable-dmalloc  Turn on dmalloc (default off)
+--enable-actmon   enable activity monitor (default is off)
+--enable-preproc  enable preprocessor (default is on)
+--enable-debug    enable debugging (default is off)
+
+--with-gnuplot          use gnuplot (default is yes)
+--with-graphviz-dot     use GraphViz dot (default is yes)
+--with-epstopdf         use epstopdf (default is yes)
+--with-convert          use ImageMagick convert (default is yes)
+--with-swiprolog        use SWI Prolog (default is yes)
+--with-doxygen          use doxygen (default is yes)
+--with-runtime-user     user id to use for runtime (default is nobody)
+
+
+Uncomment "#LoadModule prelude" in "/usr/local/etc/orchids/orchids-modules.conf".
+
+In "/usr/local/etc/orchids/conf.d/17_mod_prelude.conf" choose the "Mode sensor".
+Uncomment all str_field to enable prelude's functions then configure the PreludeDBSettings.
+
+
+For CentOS:
+
+Usually in "/usr/local/etc/orchids/orchids-inputs.conf" repalce "/var/log/auth.log" by "/var/log/secure".
+You will have to create the file /var/run/audispd_events.
+
+Note:
+
+If you want to test a particular rule, comment the other rules on "/usr/local/etc/orchids/orchids-rules.conf"
+and reboot orchids without re-compiling.
+

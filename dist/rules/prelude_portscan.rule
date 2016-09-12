@@ -1,0 +1,57 @@
+/*
+ * Quick and dirty portscan detector, through snort.
+ */
+
+rule prelude_portscan {
+  state init {
+    expect (.snort.message == "PORTSCAN DETECTED")
+      goto portscan_begin;
+  }
+
+  state portscan_begin {
+    $sip = .snort.sip;
+    $threshold = .snort.threshold;
+    $msg = "portscan detected from " + str_from_ipv4($sip);
+    .prelude.classification_text == .snort.message;
+    .prelude.assessment_completion == "succeeded";
+
+    print ($msg);
+    goto portscan_alert;
+  }
+
+#if 0
+  state portscan_status {
+    cut ("portscan_begin");
+
+    expect (.snort.message == "portscan status" &&
+	.snort.sip == $sip)
+      goto portscan_status;
+
+    /* log all firewall activity corresponding to this scan */
+    expect (.netfilter.src == $sip)
+      goto portscan_status;
+    expect (.netfilter.dst == $sip)
+      goto portscan_status;
+
+    expect (.snort.message == "End of portscan" &&
+	.snort.sip == $sip)
+      goto portscan_alert;
+  }
+#endif
+
+  state portscan_alert {
+    $message = "portscan completed";
+    $source = str_from_ipv4($sip);
+    print ($message);
+
+    $idmef = idmef_message_new();
+    idmef_message_set($idmef, "alert.assessment.impact.description", $message);
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "succeeded");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.classification.text", .snort.message);
+    idmef_message_set($idmef, "alert.source(0).node.address(0).address", $source);
+    idmef_message_set($idmef, "alert.target(0).node.address(0).address", "root");
+    idmef_message_send($idmef);
+  }
+}

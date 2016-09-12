@@ -1,0 +1,7 @@
+#
+# Configuratino file for the udp input module
+#
+
+<module udp>
+
+</module>

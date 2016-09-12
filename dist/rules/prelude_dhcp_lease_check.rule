@@ -1,0 +1,168 @@
+
+/* Quick and dirty dhcp lease check detector, through snort.
+*/
+
+rule prelude_dhcp_lease_check {
+  state init {
+    expect (.dhcpd.method == "DHCPDISCOVER")
+      goto discover;
+  }
+
+  state discover {
+    $mac = .dhcpd.mac;
+    $message = "DHCP discover: a machine is waking up to the network";
+    print ($message);
+
+    .prelude.classification_text == "DHCP discover";
+    .prelude.assessment_completion == "failed";
+    $idmef = idmef_message_new();
+
+    expect (.dhcpd.method == "DHCPOFFER" &&
+	.dhcpd.mac == $mac)
+      goto offer;
+    expect (.dhcpd.method != "DHCPOFFER" &&
+	.dhcpd.mac == $mac)
+      goto alert_offer;
+  }
+
+  state alert_offer {
+    $message = "DHCP expecting offer, did not get any";
+    $idmef = idmef_message_new();
+    idmef_message_set($idmef, "alert.assessment.impact.description", $message);
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.classification.text", "DHCP discover");
+    idmef_message_set($idmef, "alert.source(0).node.address(0).address", .dhcpd.mac);
+    idmef_message_set($idmef, "alert.target(0).node.address(0).address", $name);
+    //additionnal data / print
+    idmef_message_send($idmef);
+  }
+
+  state offer {
+    $ip = .dhcpd.ip;
+    cut ("discover");
+
+    expect (.dhcpd.method == "DHCPREQUEST" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip == $ip)
+      goto request;
+    expect (.dhcpd.method == "DHCPRELEASE" &&
+	.dhcpd.mac == $mac &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(0)", .dhcpd.mac))
+      goto release;
+    expect (.dhcpd.method != "DHCPREQUEST" &&
+	.dhcpd.method != "DHCPRELEASE" &&
+	.dhcpd.mac == $mac &&
+        idmef_message_set($idmef, "alert.classification.text", .dhcpd.method) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(0)", .dhcpd.mac))
+      goto alert_request;
+  }
+
+  state alert_request {
+    $message = "DHCP offer gotten, should have gotten request";
+    idmef_message_set($idmef, "alert.assessment.impact.description", $message);
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.target(0).user.userid(0).name", $name);
+    idmef_message_get_string($idmef, "alert.target(0).node(0).name", $name);
+    idmef_message_set($idmef, "alert.target(0).node.name", $name);
+    //additionnal data / print
+    idmef_message_send($idmef);
+  }
+
+  state request {
+    cut ("offer");
+
+    expect (.dhcpd.method == "DHCPACK" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip == $ip &&
+        idmef_message_set($idmef, "alert.classification.text", .dhcpd.method) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(0)", .dhcpd.ip) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(1)", .dhcpd.mac))
+      goto offer;
+    expect (.dhcpd.method == "DHCPREQUEST" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip == $ip &&
+        idmef_message_set($idmef, "alert.classification.text", .dhcpd.method) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(0)", .dhcpd.ip) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(1)", .dhcpd.mac))
+      goto request;
+    expect (.dhcpd.method == "DHCPREQUEST" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip != $ip &&
+        idmef_message_set($idmef, "alert.classification.text", .dhcpd.method) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(0)", .dhcpd.ip) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(1)", .dhcpd.mac))
+      goto alert_client_request;
+    expect (.dhcpd.method == "DHCPRELEASE" &&
+	.dhcpd.mac == $mac &&
+        idmef_message_set($idmef, "alert.classification.text", .dhcpd.method) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(0)", .dhcpd.ip) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(1)", .dhcpd.mac))
+      goto release;
+    expect (.dhcpd.method != "DHCPACK" &&
+	.dhcpd.method != "DHCPRELEASE" &&
+	.dhcpd.mac == $mac &&
+        idmef_message_set($idmef, "alert.classification.text", .dhcpd.method) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(0)", .dhcpd.ip) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(1)", .dhcpd.mac))
+      goto alert_ack;
+    expect (.dhcpd.method == "DHCPACK" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip != $ip &&
+        idmef_message_set($idmef, "alert.classification.text", .dhcpd.method) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(0)", .dhcpd.ip) &&
+        idmef_message_set($idmef, "alert.source(0).node.address.netmask(1)", .dhcpd.mac))
+      goto alert_bad_ip;
+  }
+
+  state alert_client_request {
+    $message = "DHCP client requests a new IP without first releasing";
+    print ($message);
+    idmef_message_set($idmef, "alert.assessment.impact.description", $message);
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.target(0).user.userid(0).name", $name);
+    idmef_message_get_string($idmef, "alert.target(0).node(0).name", $name);
+    idmef_message_set($idmef, "alert.target(0).node.name", $name);
+    idmef_message_send($idmef);
+  }
+
+  state alert_ack {
+    $message = "DHCP request, no ack answered";
+    print ($message);
+    idmef_message_set($idmef, "alert.assessment.impact.description", $message);
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.target(0).user.userid(0).name", $name);
+    idmef_message_get_string($idmef, "alert.target(0).node(0).name", $name);
+    idmef_message_set($idmef, "alert.target(0).node.name", $name);
+    idmef_message_send($idmef);
+  }
+
+  state alert_bad_ip {
+    $message ="DHCP server tried to change client ip address!";
+    print ($message);
+    idmef_message_set($idmef, "alert.assessment.impact.description", $message);
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.target(0).node.address(0).address", $name);
+    idmef_message_send($idmef);
+  }
+
+  state release {
+    $message = "DHCP release, OK";
+    print ($message);
+    idmef_message_set($idmef, "alert.assessment.impact.description", $message);
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.target(0).node.address(0).address", $name);
+    idmef_message_send($idmef);
+  }
+}

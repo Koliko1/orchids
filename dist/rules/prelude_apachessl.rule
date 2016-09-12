@@ -1,0 +1,68 @@
+/*
+
+openssl-too-open attack
+
+Check Apache error log for
+
+[Thu Sep 23 17:50:19 2004] [error] OpenSSL: error:1406908F:lib(20):func(105):reason(143)
+[Thu Sep 23 17:51:08 2004] [error] mod_ssl: SSL handshake failed (server mure.lsv.ens-cachan.fr:443, ...
+
+    lib(20) == ERR_LIB_SSL                       in ./crypto/err/err.h
+  func(105) == SSL_F_GET_CLIENT_FINISHED         in ./crypto/ssl/ssl.h
+reason(143) == SSL_R_CONNECTION_ID_IS_DIFFERENT  in ./crypto/ssl/ssl.h
+
+*/
+
+
+rule prelude_apachessl
+{
+  state init
+  {
+    expect (.entropy.message == "RISING ALARM" &&
+        .entropy.dst_port == 443)
+      goto entropy_alert;
+  }
+
+  state entropy_alert
+  {
+    $attacker = .entropy.src_ip;
+    $port = .entropy.src_port;
+
+    expect (.sslerror.module  == "mod_ssl" &&
+        .sslerror.severity == "error" &&
+        .sslerror.message == "SSL handshake failed" &&
+        .sslerror.cli_addr == $attacker)
+        goto ssl_error;
+  }
+
+  state ssl_error
+  {
+    expect (.sslerror.module  == "OpenSSL" &&
+        .sslerror.severity == "error" &&
+        .sslerror.message == "error" &&
+        .sslerror.openssl_code == "1406908F" &&
+        .prelude.classification_text == "Apache SSL handshake" &&
+        .prelude.assessment_completion == "Failed" )
+      goto ssl_alert;
+  }
+
+  state ssl_alert {
+    $source = str_from_ipv4(.entropy.src_ip);
+    $port = str_from_int(.entropy.src_port);
+    $response = "ssh root@10.0.0.100 '/sbin/iptables --append orchids --proto TCP --source-port 443 --destination " +
+    str_from_ipv4( $attacker ) + " --destination-port " + str_from_int( $port ) + " --jump DROP' &";
+
+    $idmef = idmef_message_new();
+    idmef_message_set($idmef, "alert.assessment.impact.description", .sslerror.message);
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.classification.text", "SSL handshake");
+    idmef_message_set($idmef, "alert.source(0).node.address(0).address", $source);
+    idmef_message_set($idmef, "alert.target(0).node.address(0).address", "Target");
+    idmef_message_set($idmef, "alert.target(0).service.name", "Apache");
+    idmef_message_set($idmef, "alert.target(0).service.port", $port);
+    //additional data fort  $reponse / port / openssl_code error /
+    idmef_message_send($idmef);
+  }
+}
